@@ -1,0 +1,2 @@
+# byTech_MSClarity_MCPServer
+Microsoft ClarityのリモートMCPサーバです。
