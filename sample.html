@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Cube Design</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            background: linear-gradient(135deg, #4a6cf7 0%, #3b5bdb 100%);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 3D立方体 */
+        .cube-container {
+            perspective: 1200px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -60%);
+        }
+
+        .cube {
+            width: 300px;
+            height: 300px;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: rotateX(-15deg) rotateY(25deg) rotateZ(10deg);
+        }
+
+        .cube-face {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: #1a1a1a;
+            border: 2px solid #333;
+        }
+
+        .front {
+            transform: translateZ(150px);
+        }
+
+        .back {
+            transform: translateZ(-150px) rotateY(180deg);
+        }
+
+        .right {
+            transform: rotateY(90deg) translateZ(150px);
+            background: #0d0d0d;
+        }
+
+        .left {
+            transform: rotateY(-90deg) translateZ(150px);
+        }
+
+        .top {
+            transform: rotateX(90deg) translateZ(150px);
+            background: #262626;
+        }
+
+        .bottom {
+            transform: rotateX(-90deg) translateZ(150px);
+        }
+
+        /* 立方体の角の小さな円 */
+        .corner-dot {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #666;
+            border-radius: 50%;
+            z-index: 10;
+        }
+
+        .dot-1 { top: -6px; left: -6px; }
+        .dot-2 { top: -6px; right: -6px; }
+        .dot-3 { bottom: -6px; left: -6px; }
+        .dot-4 { bottom: -6px; right: -6px; }
+
+        /* 猫のキャラクター */
+        .cat-character {
+            position: absolute;
+            bottom: 80px;
+            right: 150px;
+            z-index: 20;
+        }
+
+        .cat-body {
+            width: 120px;
+            height: 80px;
+            background: #000;
+            border-radius: 40px 40px 20px 20px;
+            position: relative;
+        }
+
+        .cat-head {
+            width: 80px;
+            height: 70px;
+            background: #000;
+            border-radius: 50%;
+            position: absolute;
+            top: -35px;
+            left: 20px;
+        }
+
+        .cat-ear {
+            width: 25px;
+            height: 30px;
+            background: #000;
+            border-radius: 50% 50% 0 0;
+            position: absolute;
+            top: -15px;
+        }
+
+        .cat-ear.left {
+            left: 10px;
+            transform: rotate(-20deg);
+        }
+
+        .cat-ear.right {
+            right: 10px;
+            transform: rotate(20deg);
+        }
+
+        .cat-eyes {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .cat-eye {
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 8px;
+        }
+
+        .cat-eye::after {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: #000;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+        }
+
+        .cat-mouth {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 10px;
+            border: 2px solid #fff;
+            border-top: none;
+            border-radius: 0 0 20px 20px;
+        }
+
+        .cat-whiskers {
+            position: absolute;
+            top: 35px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .whisker {
+            width: 25px;
+            height: 1px;
+            background: #fff;
+            position: absolute;
+        }
+
+        .whisker.left-1 { left: -35px; top: -5px; transform: rotate(10deg); }
+        .whisker.left-2 { left: -35px; top: 5px; transform: rotate(-10deg); }
+        .whisker.right-1 { right: -35px; top: -5px; transform: rotate(-10deg); }
+        .whisker.right-2 { right: -35px; top: 5px; transform: rotate(10deg); }
+
+        /* ピンクの円 */
+        .pink-circle {
+            position: absolute;
+            bottom: 50px;
+            right: 50px;
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #ff6b9d, #e91e63);
+            border-radius: 50%;
+            z-index: 15;
+            box-shadow: 0 10px 30px rgba(233, 30, 99, 0.3);
+        }
+
+        /* アニメーション */
+        .cube {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: rotateX(-15deg) rotateY(25deg) rotateZ(10deg) translateY(0px);
+            }
+            50% {
+                transform: rotateX(-15deg) rotateY(25deg) rotateZ(10deg) translateY(-20px);
+            }
+        }
+
+        .cat-character {
+            animation: catFloat 4s ease-in-out infinite;
+        }
+
+        @keyframes catFloat {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .pink-circle {
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 3D立方体 -->
+        <div class="cube-container">
+            <div class="cube">
+                <div class="cube-face front">
+                    <div class="corner-dot dot-1"></div>
+                    <div class="corner-dot dot-2"></div>
+                    <div class="corner-dot dot-3"></div>
+                    <div class="corner-dot dot-4"></div>
+                </div>
+                <div class="cube-face back"></div>
+                <div class="cube-face right">
+                    <div class="corner-dot dot-1"></div>
+                    <div class="corner-dot dot-2"></div>
+                    <div class="corner-dot dot-3"></div>
+                    <div class="corner-dot dot-4"></div>
+                </div>
+                <div class="cube-face left"></div>
+                <div class="cube-face top">
+                    <div class="corner-dot dot-1"></div>
+                    <div class="corner-dot dot-2"></div>
+                    <div class="corner-dot dot-3"></div>
+                    <div class="corner-dot dot-4"></div>
+                </div>
+                <div class="cube-face bottom"></div>
+            </div>
+        </div>
+
+        <!-- 猫のキャラクター -->
+        <div class="cat-character">
+            <div class="cat-body">
+                <div class="cat-head">
+                    <div class="cat-ear left"></div>
+                    <div class="cat-ear right"></div>
+                    <div class="cat-eyes">
+                        <div class="cat-eye"></div>
+                        <div class="cat-eye"></div>
+                    </div>
+                    <div class="cat-mouth"></div>
+                    <div class="cat-whiskers">
+                        <div class="whisker left-1"></div>
+                        <div class="whisker left-2"></div>
+                        <div class="whisker right-1"></div>
+                        <div class="whisker right-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ピンクの円 -->
+        <div class="pink-circle"></div>
+    </div>
+</body>
+</html>
