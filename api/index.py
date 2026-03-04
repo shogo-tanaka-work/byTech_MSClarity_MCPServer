@@ -11,12 +11,20 @@ from http.server import BaseHTTPRequestHandler
 # Import Clarity API Client
 try:
     from clarity_mcp_server.api_client import ClarityAPIClient
+    from clarity_mcp_server.server import (
+        JSONRPC_PARSE_ERROR, JSONRPC_METHOD_NOT_FOUND,
+        JSONRPC_INVALID_PARAMS, JSONRPC_INTERNAL_ERROR
+    )
 except ImportError:
     # For Vercel deployment, try relative import
     import sys
     import os
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from clarity_mcp_server.api_client import ClarityAPIClient
+    from clarity_mcp_server.server import (
+        JSONRPC_PARSE_ERROR, JSONRPC_METHOD_NOT_FOUND,
+        JSONRPC_INVALID_PARAMS, JSONRPC_INTERNAL_ERROR
+    )
 
 
 class handler(BaseHTTPRequestHandler):
@@ -105,7 +113,7 @@ class handler(BaseHTTPRequestHandler):
                 body_data = self.rfile.read(content_length)
                 try:
                     body = json.loads(body_data.decode('utf-8'))
-                except:
+                except (json.JSONDecodeError, UnicodeDecodeError):
                     body = {}
 
             if path == '/api/clarity-data':
@@ -142,17 +150,13 @@ class handler(BaseHTTPRequestHandler):
             return
 
         # Run async API call
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
-            result = loop.run_until_complete(self._fetch_clarity_data_async(
+            result = asyncio.run(self._fetch_clarity_data_async(
                 num_of_days, dimensions, metrics, context, token
             ))
             self._send_json_response(200, result)
         except Exception as e:
-            self._send_json_response(500, {'error': f'Internal server error: {str(e)}'})
-        finally:
-            loop.close()
+            self._send_json_response(500, {'error': 'Internal server error'})
 
     async def _fetch_clarity_data_async(self, num_of_days, dimensions=None, metrics=None, context=None, token=None):
         """Fetch Clarity data asynchronously"""
@@ -285,10 +289,8 @@ class handler(BaseHTTPRequestHandler):
                 if len(dimensions) > 3:
                     dimensions = dimensions[:3]
 
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
                 try:
-                    result = loop.run_until_complete(self._fetch_clarity_data_async(
+                    result = asyncio.run(self._fetch_clarity_data_async(
                         num_of_days, dimensions, metrics, context, token
                     ))
                     self._send_json_response(200, {
@@ -300,22 +302,20 @@ class handler(BaseHTTPRequestHandler):
                     self._send_json_response(200, {
                         'jsonrpc': '2.0',
                         'id': request_id,
-                        'error': {'code': -32603, 'message': f'Tool execution failed: {str(e)}'}
+                        'error': {'code': JSONRPC_INTERNAL_ERROR, 'message': 'Tool execution failed'}
                     })
-                finally:
-                    loop.close()
             else:
                 self._send_json_response(200, {
                     'jsonrpc': '2.0',
                     'id': request_id,
-                    'error': {'code': -32601, 'message': f'Unknown tool: {tool_name}'}
+                    'error': {'code': JSONRPC_METHOD_NOT_FOUND, 'message': f'Unknown tool: {tool_name}'}
                 })
 
         else:
             self._send_json_response(200, {
                 'jsonrpc': '2.0',
                 'id': request_id,
-                'error': {'code': -32601, 'message': f"Method '{method}' not found"}
+                'error': {'code': JSONRPC_METHOD_NOT_FOUND, 'message': f"Method '{method}' not found"}
             })
 
     def _send_json_response(self, status_code, data):

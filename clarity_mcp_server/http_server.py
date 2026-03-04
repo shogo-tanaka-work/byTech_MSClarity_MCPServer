@@ -4,12 +4,15 @@ FastAPI-based HTTP endpoints for remote deployment
 """
 
 import json
+import logging
 import os
 from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from .api_client import ClarityAPIClient
+
+logger = logging.getLogger(__name__)
 
 
 class ClarityDataRequest(BaseModel):
@@ -78,7 +81,7 @@ class ClarityHTTPServer:
                 if dimensions:
                     dimensions = self.api_client.validate_dimensions(dimensions)
                     if len(dimensions) == 0:
-                        print("Warning: All provided dimensions were invalid")
+                        logger.warning("All provided dimensions were invalid")
 
                 # Fetch data from Clarity API
                 data = await self.api_client.fetch_clarity_data(
@@ -98,13 +101,15 @@ class ClarityHTTPServer:
                         data = self.api_client.filter_metrics(data, metrics)
                     else:
                         # Handle case where data is not a list
-                        print(f"Warning: Expected list data but got {type(data)}")
+                        logger.warning("Expected list data but got %s", type(data))
 
                 return {"data": data}
 
+            except HTTPException:
+                raise
             except Exception as e:
-                print(f"Error processing request: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
+                logger.exception("Error processing request")
+                raise HTTPException(status_code=500, detail="Internal server error")
 
         @self.app.post("/mcp")
         async def mcp_endpoint(request: Request):
@@ -125,9 +130,11 @@ class ClarityHTTPServer:
                 else:
                     raise HTTPException(status_code=400, detail=f"Unknown action: {mcp_request.action}")
 
+            except HTTPException:
+                raise
             except Exception as e:
-                print(f"Error processing MCP request: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
+                logger.exception("Error processing MCP request")
+                raise HTTPException(status_code=500, detail="Internal server error")
 
         @self.app.get("/info")
         async def server_info():

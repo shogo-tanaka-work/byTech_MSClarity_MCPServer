@@ -5,9 +5,19 @@ Python implementation using MCP protocol
 
 import asyncio
 import json
+import logging
 import sys
 from typing import Any, Dict, List, Optional
 from .api_client import ClarityAPIClient
+
+logger = logging.getLogger(__name__)
+
+# JSON-RPC 2.0 error codes
+JSONRPC_PARSE_ERROR = -32700
+JSONRPC_INVALID_REQUEST = -32600
+JSONRPC_METHOD_NOT_FOUND = -32601
+JSONRPC_INVALID_PARAMS = -32602
+JSONRPC_INTERNAL_ERROR = -32000
 
 
 class ClarityMCPServer:
@@ -95,7 +105,7 @@ class ClarityMCPServer:
         else:
             return {
                 "error": {
-                    "code": -32601,
+                    "code": JSONRPC_METHOD_NOT_FOUND,
                     "message": f"Method '{tool_name}' not found"
                 }
             }
@@ -114,7 +124,7 @@ class ClarityMCPServer:
             if not num_of_days:
                 return {
                     "error": {
-                        "code": -32602,
+                        "code": JSONRPC_INVALID_PARAMS,
                         "message": "numOfDays is required"
                     }
                 }
@@ -122,7 +132,7 @@ class ClarityMCPServer:
             if not isinstance(num_of_days, int) or num_of_days < 1 or num_of_days > 3:
                 return {
                     "error": {
-                        "code": -32602,
+                        "code": JSONRPC_INVALID_PARAMS,
                         "message": "numOfDays must be an integer between 1 and 3"
                     }
                 }
@@ -131,7 +141,7 @@ class ClarityMCPServer:
             if dimensions:
                 dimensions = self.api_client.validate_dimensions(dimensions)
                 if len(dimensions) == 0:
-                    print("Warning: All provided dimensions were invalid")
+                    logger.warning("All provided dimensions were invalid")
 
             # Fetch data from Clarity API
             data = await self.api_client.fetch_clarity_data(
@@ -145,7 +155,7 @@ class ClarityMCPServer:
             if "error" in data:
                 return {
                     "error": {
-                        "code": -32000,
+                        "code": JSONRPC_INTERNAL_ERROR,
                         "message": data["error"]
                     }
                 }
@@ -156,7 +166,7 @@ class ClarityMCPServer:
                     data = self.api_client.filter_metrics(data, metrics)
                 else:
                     # Handle case where data is not a list (might be wrapped in another structure)
-                    print(f"Warning: Expected list data but got {type(data)}")
+                    logger.warning("Expected list data but got %s", type(data))
 
             return {
                 "content": [
@@ -168,10 +178,11 @@ class ClarityMCPServer:
             }
 
         except Exception as e:
+            logger.exception("Error handling get-clarity-data")
             return {
                 "error": {
-                    "code": -32000,
-                    "message": f"Internal server error: {str(e)}"
+                    "code": JSONRPC_INTERNAL_ERROR,
+                    "message": "Internal server error"
                 }
             }
 
@@ -190,30 +201,29 @@ class ClarityMCPServer:
             else:
                 return {
                     "error": {
-                        "code": -32601,
+                        "code": JSONRPC_METHOD_NOT_FOUND,
                         "message": f"Method '{method}' not found"
                     }
                 }
 
         except Exception as e:
+            logger.exception("Error handling request")
             return {
                 "error": {
-                    "code": -32000,
-                    "message": f"Internal server error: {str(e)}"
+                    "code": JSONRPC_INTERNAL_ERROR,
+                    "message": "Internal server error"
                 }
             }
 
     async def start_stdio_server(self):
         """Start the server in stdio mode for MCP"""
-        print("Starting Microsoft Clarity MCP Server (stdio mode)...", file=sys.stderr)
+        logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
+        logger.info("Starting Microsoft Clarity MCP Server (stdio mode)...")
 
         if self.api_client.api_token:
-            print("Clarity API token configured via environment variable", file=sys.stderr)
+            logger.info("Clarity API token configured")
         else:
-            print("No Clarity API token configured, it must be provided with each request", file=sys.stderr)
-
-        print(f"Supported metrics: {', '.join(self.api_client.AVAILABLE_METRICS)}", file=sys.stderr)
-        print(f"Supported dimensions: {', '.join(self.api_client.AVAILABLE_DIMENSIONS)}", file=sys.stderr)
+            logger.warning("No Clarity API token configured, it must be provided with each request")
 
         import asyncio
         import threading
@@ -267,49 +277,40 @@ class ClarityMCPServer:
                 except json.JSONDecodeError as e:
                     error_response = {
                         "error": {
-                            "code": -32700,
-                            "message": f"Parse error: {str(e)}"
+                            "code": JSONRPC_PARSE_ERROR,
+                            "message": "Parse error"
                         }
                     }
                     print(json.dumps(error_response), flush=True)
                 except Exception as e:
+                    logger.exception("Unexpected error processing request")
                     error_response = {
                         "error": {
-                            "code": -32000,
-                            "message": f"Internal server error: {str(e)}"
+                            "code": JSONRPC_INTERNAL_ERROR,
+                            "message": "Internal server error"
                         }
                     }
                     print(json.dumps(error_response), flush=True)
 
         except KeyboardInterrupt:
-            print("Server shutting down...", file=sys.stderr)
+            logger.info("Server shutting down...")
         except Exception as e:
-            print(f"Server error: {e}", file=sys.stderr)
+            logger.exception("Server error")
             sys.exit(1)
 
 
-# Global server instance
-_server_instance: Optional[ClarityMCPServer] = None
-
-
-def get_server(api_token: Optional[str] = None) -> ClarityMCPServer:
-    """Get or create server instance"""
-    global _server_instance
-    if _server_instance is None:
-        _server_instance = ClarityMCPServer(api_token)
-    return _server_instance
-
-
-async def main():
+async def main(api_token: Optional[str] = None):
     """Main entry point"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Microsoft Clarity MCP Server")
-    parser.add_argument("--clarity_api_token", help="Clarity API token")
+    # If called directly (not via cli.py), parse args
+    if api_token is None:
+        parser = argparse.ArgumentParser(description="Microsoft Clarity MCP Server")
+        parser.add_argument("--clarity_api_token", help="Clarity API token")
+        args = parser.parse_args()
+        api_token = args.clarity_api_token
 
-    args = parser.parse_args()
-
-    server = get_server(args.clarity_api_token)
+    server = ClarityMCPServer(api_token)
     await server.start_stdio_server()
 
 

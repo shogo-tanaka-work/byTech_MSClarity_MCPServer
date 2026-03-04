@@ -4,9 +4,12 @@ Microsoft Clarity API Client
 
 import os
 import asyncio
+import logging
 import httpx
 from typing import List, Optional, Dict, Any
 from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
 
 
 class ClarityAPIClient:
@@ -63,7 +66,7 @@ class ClarityAPIClient:
     async def fetch_clarity_data(
         self,
         num_of_days: int,
-        dimensions: List[str] = None,
+        dimensions: Optional[List[str]] = None,
         context: Optional[str] = None,
         api_token: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -108,7 +111,7 @@ class ClarityAPIClient:
             query_string = urlencode(params)
             url = f"{self.API_BASE_URL}?{query_string}"
 
-            print(f"Making request to: {url}")
+            logger.debug("Making request to Clarity API (numOfDays=%s)", num_of_days)
 
             # Make the API request
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -121,19 +124,22 @@ class ClarityAPIClient:
                 )
 
                 if not response.is_success:
+                    logger.error("Clarity API returned status %s", response.status_code)
                     return {
-                        "error": f"API request failed with status {response.status_code}: {response.text}"
+                        "error": f"API request failed with status {response.status_code}"
                     }
 
                 return response.json()
 
         except httpx.TimeoutException:
+            logger.error("Clarity API request timed out")
             return {"error": "Request timeout - the API took too long to respond"}
         except httpx.RequestError as e:
-            return {"error": f"Request error: {str(e)}"}
+            logger.error("Clarity API request error: %s", e)
+            return {"error": "Request error - failed to connect to the API"}
         except Exception as e:
-            print(f"Error fetching Clarity data: {e}")
-            return {"error": f"Unknown error: {str(e)}"}
+            logger.exception("Unexpected error fetching Clarity data")
+            return {"error": "Internal error while fetching data"}
 
     def validate_dimensions(self, dimensions: List[str]) -> List[str]:
         """Validate and filter dimensions against known valid dimensions
@@ -149,7 +155,7 @@ class ClarityAPIClient:
             if dim in self.AVAILABLE_DIMENSIONS:
                 valid_dimensions.append(dim)
             else:
-                print(f"Warning: Invalid dimension '{dim}' will be filtered out")
+                logger.warning("Invalid dimension '%s' will be filtered out", dim)
 
         return valid_dimensions
 
