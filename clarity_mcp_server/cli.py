@@ -76,12 +76,8 @@ Examples:
         # Start stdio MCP server
         print("Starting Microsoft Clarity MCP Server (stdio mode)...")
 
-        # Set environment variable if token provided via CLI
-        if args.clarity_api_token:
-            os.environ['CLARITY_API_TOKEN'] = args.clarity_api_token
-
-        # Run the async main function
-        asyncio.run(server_main())
+        # Run the async main function, passing token directly
+        asyncio.run(server_main(args.clarity_api_token))
 
 
 if __name__ == "__main__":
